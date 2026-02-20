@@ -1,6 +1,6 @@
 <?php
 
-// require 'vendor/autoload.php';
+require 'vendor/autoload.php';
 
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use MicrosoftAzure\Storage\Blob\Models\ListBlobsOptions;
@@ -73,3 +73,4 @@ try {
     die("Error al listar blobs: " . $e->getMessage());
 }
 ?>
+<p> ayuda </p>

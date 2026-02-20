@@ -13,7 +13,7 @@ $connectionString = getenv("AZURE_STORAGE_CONNECTION_STRING");
 $containerName = "comprimidos";
 
 if (!$connectionString) {
-    die("La variable AZURE_STORAGE_CONNECTION_STRING no está configurada.");
+    // die("La variable AZURE_STORAGE_CONNECTION_STRING no está configurada.");
 }
 
 $blobClient = BlobRestProxy::createBlobService($connectionString);
@@ -32,9 +32,9 @@ if (isset($_GET['download_blob'])) {
         echo $content;
         exit;
     } catch (Exception $e) {
-        http_response_code(500);
+        // http_response_code(500);
         echo "Error al descargar el archivo: " . $e->getMessage();
-        exit;
+        // exit;
     }
 }
 
@@ -72,7 +72,7 @@ try {
 } catch (Exception $e) {
     die("Error al listar blobs: " . $e->getMessage());
 }
-
+?>
 
 <!DOCTYPE html>
 <html lang="es">
