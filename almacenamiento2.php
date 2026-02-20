@@ -72,7 +72,7 @@ try {
 } catch (Exception $e) {
     die("Error al listar blobs: " . $e->getMessage());
 }
-?>
+
 
 <!DOCTYPE html>
 <html lang="es">
@@ -108,3 +108,4 @@ try {
     </form>
 </body>
 </html>
+?>
