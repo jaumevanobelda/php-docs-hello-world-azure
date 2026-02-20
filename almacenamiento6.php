@@ -1,5 +1,5 @@
 <?php
-echo "<p>ayuda por favor</p>" 
+
 require 'vendor/autoload.php';
 
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
@@ -18,50 +18,63 @@ if (!$connectionString) {
 
 $blobClient = BlobRestProxy::createBlobService($connectionString);
 
-// Descargar archivo si se solicita
+// Descargar archivo si se solicita (se procesa antes de cualquier salida HTML)
 if (isset($_GET['download_blob'])) {
     $blobName = $_GET['download_blob'];
     try {
         $blob = $blobClient->getBlob($containerName, $blobName);
         $content = stream_get_contents($blob->getContentStream());
+        $filename = basename($blobName);
+        // Sanitizar nombre de archivo para la cabecera
+        $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '_', $filename);
 
         header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="' . basename($blobName) . '"');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Content-Length: ' . strlen($content));
 
         echo $content;
         exit;
     } catch (Exception $e) {
         http_response_code(500);
-        echo "Error al descargar el archivo: " . $e->getMessage();
+        echo "Error al descargar el archivo: " . htmlspecialchars($e->getMessage());
         exit;
     }
 }
 
+$messages = [];
+
 // Eliminar archivo si se envió solicitud
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_blob'])) {
+    $deleteBlobName = $_POST['delete_blob'];
     try {
-        $blobClient->deleteBlob($containerName, $_POST['delete_blob']);
-        echo "<p style='color:green;'>Archivo eliminado: {$_POST['delete_blob']}</p>";
+        $blobClient->deleteBlob($containerName, $deleteBlobName);
+        $messages[] = "<p style='color:green;'>Archivo eliminado: " . htmlspecialchars($deleteBlobName) . "</p>";
     } catch (Exception $e) {
-        echo "<p style='color:red;'>Error al eliminar: {$e->getMessage()}</p>";
+        $messages[] = "<p style='color:red;'>Error al eliminar: " . htmlspecialchars($e->getMessage()) . "</p>";
     }
 }
 
 // Subir archivo nuevo
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['zipfile'])) {
     $file = $_FILES['zipfile'];
-    if ($file['error'] === UPLOAD_ERR_OK && mime_content_type($file['tmp_name']) === 'application/zip') {
+    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if ($file['error'] === UPLOAD_ERR_OK && $extension === 'zip' && mime_content_type($file['tmp_name']) === 'application/zip') {
         $blobName = basename($file['name']);
         try {
-            $content = fopen($file['tmp_name'], 'r');
+            $content = fopen($file['tmp_name'], 'rb');
             $blobClient->createBlockBlob($containerName, $blobName, $content);
-            echo "<p style='color:green;'>Archivo subido: {$blobName}</p>";
+            if (is_resource($content)) {
+                fclose($content);
+            }
+            $messages[] = "<p style='color:green;'>Archivo subido: " . htmlspecialchars($blobName) . "</p>";
         } catch (Exception $e) {
-            echo "<p style='color:red;'>Error al subir: {$e->getMessage()}</p>";
+            if (isset($content) && is_resource($content)) {
+                fclose($content);
+            }
+            $messages[] = "<p style='color:red;'>Error al subir: " . htmlspecialchars($e->getMessage()) . "</p>";
         }
     } else {
-        echo "<p style='color:red;'>Solo se permiten archivos .zip válidos.</p>";
+        $messages[] = "<p style='color:red;'>Solo se permiten archivos .zip válidos.</p>";
     }
 }
 
@@ -70,7 +83,7 @@ try {
     $blobList = $blobClient->listBlobs($containerName, new ListBlobsOptions());
     $blobs = $blobList->getBlobs();
 } catch (Exception $e) {
-    die("Error al listar blobs: " . $e->getMessage());
+    die("Error al listar blobs: " . htmlspecialchars($e->getMessage()));
 }
 ?>
 
@@ -83,6 +96,10 @@ try {
 <body>
     <h1>Archivos ZIP en '<?= htmlspecialchars($containerName) ?>'</h1>
 
+    <?php foreach ($messages as $msg): ?>
+        <?= $msg ?>
+    <?php endforeach; ?>
+
     <ul>
     <?php if (empty($blobs)): ?>
         <li>No hay archivos ZIP.</li>
@@ -92,8 +109,8 @@ try {
                 <a href="?download_blob=<?= urlencode($blob->getName()) ?>" target="_blank">
                     <?= htmlspecialchars($blob->getName()) ?>
                 </a>
-                <form method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar <?= htmlspecialchars($blob->getName()) ?>?')">
-                    <input type="hidden" name="delete_blob" value="<?= htmlspecialchars($blob->getName()) ?>">
+                <form method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar ' + this.delete_blob.value + '?')">
+                    <input type="hidden" name="delete_blob" value="<?= htmlspecialchars($blob->getName(), ENT_QUOTES, 'UTF-8') ?>">
                     <button type="submit" style="color:red;">Eliminar</button>
                 </form>
             </li>
